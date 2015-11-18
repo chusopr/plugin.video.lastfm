@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.lastfm" name="Last.fm" version="1.0.0" provider-name="chuso">
+    <requires>
+        <!-- May work with previous versions, but it was only tested with these -->
+        <import addon="xbmc.python" version="2.20.0"/>
+        <import addon="plugin.video.youtube" version="5.1.9"/>
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="addon.py">
+        <provides>video</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en">Last.fm radio stations</summary>
+        <description lang="en">Provides access to Last.fm radio stations streaming music from YouTube.</description>
+        <language></language>
+        <platform>all</platform>
+        <license>Artistic</license>
+        <email>kodi-lastfm@chuso.net</email>
+        <source>https://github.com/chusopr/kodi-lastfm</source>
+    </extension>
+</addon>
