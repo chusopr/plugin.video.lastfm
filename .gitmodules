@@ -1,0 +1,3 @@
+[submodule "resources/lib/youtube-dl"]
+	path = resources/lib/youtube-dl
+	url = https://github.com/chusopr/kodi-lastfm-youtube-dl/

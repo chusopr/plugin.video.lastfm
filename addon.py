@@ -7,26 +7,30 @@ import urllib, urllib2, urlparse
 import string, base64, json
 import os.path, tempfile
 
-# Find and import needed modules from plugin.video.youtube addon
-youtube_addon = xbmcaddon.Addon('plugin.video.youtube')
-youtube_path = youtube_addon.getAddonInfo('path')
-sys.path.append(youtube_path)
-from resources.lib.youtube.client.youtube import YouTube
-from resources.lib import kodion
+# Try to import bundled youtube-dl library first and failback to system one
+sys.path.insert(0, os.path.join(xbmcaddon.Addon().getAddonInfo('path'), "resources", "lib", "youtube-dl"))
 
+# Needed classes from youtube-dl
+from youtube_dl import YoutubeDL
+from youtube_dl.utils import DownloadError
+
+# Just a reminder:
 # argv:
 # 0: base URL
 # 1: handle
 # 3: query string
 
+# Know a little about myself:
 addon_name = xbmcaddon.Addon().getAddonInfo("name")
 addon_handle = int(sys.argv[1])
 base_url = sys.argv[0]
 args = urlparse.parse_qs(sys.argv[2][1:])
 
+# Prepend module name to error messages
 def log(msg, level=xbmc.LOGINFO):
     xbmc.log(msg="[%s] %s" % (addon_name, msg), level=level)
 
+# Method to show main menu
 def main_menu():
     xbmcplugin.setContent(addon_handle, 'musicvideos')
     lastfm_user = xbmcaddon.Addon().getSetting("username")
@@ -42,6 +46,10 @@ def main_menu():
             xbmcplugin.addDirectoryItem(handle=addon_handle, url="%s?station=user/%s/%s" % (base_url, lastfm_user, station), listitem=li)
         xbmcplugin.endOfDirectory(addon_handle)
 
+""" Last.fm servers seemed to be pretty unstable when their beta website was
+ rolled out and they reply with errors quite often.
+ Now they seem more stable, but we keep the option to ask user if it wants
+ to retry when servers reply with an error"""
 def lastfm_error_retry(msg):
     log(msg=msg, level=xbmc.LOGWARNING)
     return xbmcgui.Dialog().yesno("Last.fm error", msg, "Last.fm servers seem to fail randomly sometimes", "Do you want to try again?")
@@ -172,7 +180,6 @@ if "track" in args:
     """ Now, here we go with the stuff we were requested: to resolve
     to a playable URL """
 
-    # All this is to prepare YouTube search
     """ TODO: for now, we are discarding YouTube links provided by
     Last.fm because they contain crap too many times. Make this
     optional """
@@ -181,39 +188,22 @@ if "track" in args:
     title = urllib.unquote_plus(title)
     log(msg="Searching track %s" % " - ".join([artist, title]), level=xbmc.LOGDEBUG)
 
-    search_params = {
-        'q': ' - '.join([artist, title]),
-        'part': 'id',
-        # We only search in Music category
-        # TODO: make this optional
-        'videoCategoryId': 'sGDdEsjSJ_SnACpEvVQ6MtTzkrI/nqRIq97-xe5XRZTxbknKFVe5Lmg',
-        'maxResults': '1',
-        'type': 'video',
-        'videoLicense': 'any',
-        'videoEmbeddable': 'any'
-    }
-
-    # Now do the search
-    youtube_client = YouTube()
-    search_result = youtube_client._perform_v3_request(method='GET', path='search', params=search_params)
-
-    if not "items" in search_result or len(search_result["items"]) == 0:
-        xbmcgui.Dialog().ok("Song not found", ' - '.join([artist, title]))
-    else:
-        """ Get the URL to the final video file that Kodi can understand.
-        We won't let plugin.video.youtube to do the playback because it
-        overrides infoLabels """
-        context = kodion.Context()
-        streams = youtube_client.get_video_streams(context, search_result["items"][0]["id"]["videoId"])
-        stream = kodion.utils.select_stream(context, streams)
-        playback_url = stream["url"]
-        li = xbmcgui.ListItem(path=playback_url)
+    try:
+        ydl_opts = {
+            'format': 'best',
+            'no_color': True
+        }
+        ydl = YoutubeDL(ydl_opts)
+        # TODO: Use more video providers than YouTube
+        playback_url = ydl.extract_info("ytsearch: %s" % " - ".join([artist, title]), download=False)
+        li = xbmcgui.ListItem(path=playback_url["entries"][0]["url"])
         li.setInfo("music", {'artist': artist, 'title': title})
         xbmcplugin.setResolvedUrl(addon_handle, True, li)
+    except DownloadError:
+        xbmcgui.Dialog().ok("Song not found", ' - '.join([artist, title]))
 
 elif "station" in args:
     log(msg="Starting station %s" % args["station"][0], level=xbmc.LOGINFO)
-    # Retry loop executed until we get a succesful reply from Last.fm or user aborts
 
     track = get_next_track(args["station"][0])
 
