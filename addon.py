@@ -175,7 +175,7 @@ if "track" in args:
         li.setInfo("music", {'artist': artists, 'title': next_track["name"]})
         li.setProperty('IsPlayable', 'true')
         playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-        playlist.add(url="%s?track=%s&station=%s" % (base_url, next_track["url"], station_arg), listitem=li, index=playlist.getposition()+1)
+        playlist.add(url="%s?track=%s&station=%s" % (base_url, next_track["url"].replace("&", "%26"), station_arg), listitem=li, index=playlist.getposition()+1)
 
     """ Now, here we go with the stuff we were requested: to resolve
     to a playable URL """
