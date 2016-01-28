@@ -183,7 +183,7 @@ if "track" in args:
     """ TODO: for now, we are discarding YouTube links provided by
     Last.fm because they contain crap too many times. Make this
     optional """
-    (_, _, artist, _, title) = string.split(args["track"][0], "/")
+    (_, _, artist, _, title) = string.split(args["track"][0], "/", 4)
     artist = urllib.unquote_plus(artist)
     title = urllib.unquote_plus(title)
     log(msg="Searching track %s" % " - ".join([artist, title]), level=xbmc.LOGDEBUG)
