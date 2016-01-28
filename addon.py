@@ -195,7 +195,7 @@ if "track" in args:
         }
         ydl = YoutubeDL(ydl_opts)
         # TODO: Use more video providers than YouTube
-        playback_url = ydl.extract_info("ytsearch: %s" % " - ".join([artist, title]), download=False)
+        playback_url = ydl.extract_info("ytsearch: %s" % " - ".join([artist.decode("utf-8"), title.decode("utf-8")]), download=False)
         li = xbmcgui.ListItem(path=playback_url["entries"][0]["url"])
         li.setInfo("music", {'artist': artist, 'title': title})
         xbmcplugin.setResolvedUrl(addon_handle, True, li)
