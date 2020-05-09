@@ -67,8 +67,15 @@ def get_next_track(station):
     """ Playlists and current position in playlist is stored in
     temporary files with encoded station URL"""
     encoded_station = base64.urlsafe_b64encode(station)
-    json_playlist = os.path.join(tempfile.gettempdir(), "kodi-lastfm_%s.json" % encoded_station)
-    playlist_position = os.path.join(tempfile.gettempdir(), "kodi-lastfm_%s.pos" % encoded_station)
+    try:
+        tempdir = tempfile.gettempdir()
+    except IOError:
+        # FIXME there is probably a better way to do this
+        # maybe replace the whole file handling with xbmcvfs?
+        if xbmc.getCondVisibility('system.platform.android'):
+            tempdir = "/sdcard/Android/data/org.xbmc.kodi/files/.kodi/temp"
+    json_playlist = os.path.join(tempdir, "kodi-lastfm_%s.json" % encoded_station)
+    playlist_position = os.path.join(tempdir, "kodi-lastfm_%s.pos" % encoded_station)
 
     """ Will be set to True if playlist is empty or we already are
     at the end, so a new playlist for this station has to be downloaded"""
