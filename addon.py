@@ -41,7 +41,7 @@ def main_menu():
         services not working after Last.fm rolled out their beta and
         everything is broken until it comes back "soon"? """
         for station in ["library", "mix", "recommended"]:
-            li = xbmcgui.ListItem('Last.fm %s %s' % (lastfm_user, station), iconImage='DefaultMusicVideos.png')
+            li = xbmcgui.ListItem('Last.fm %s %s' % (lastfm_user, station), iconImage='DefaultMusicPlaylists.png')
             li.setProperty('IsPlayable', 'true')
             xbmcplugin.addDirectoryItem(handle=addon_handle, url="%s?station=user/%s/%s" % (base_url, lastfm_user, station), listitem=li)
         xbmcplugin.endOfDirectory(addon_handle)
@@ -174,10 +174,10 @@ if "track" in args:
         li = xbmcgui.ListItem(" - ".join([artists, next_track["name"]]))
         li.setInfo("music", {'artist': artists, 'title': next_track["name"]})
         li.setProperty('IsPlayable', 'true')
-        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-        playlist.add(url="%s?track=%s&station=%s" % (base_url, next_track["url"].replace("&", "%26"), station_arg), listitem=li, index=playlist.getposition()+1)
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
+        playlist.add(url="%s?track=%s&station=%s" % (base_url, next_track["url"].replace("&", "%26"), station_arg), listitem=li, index=playlist.size())
 
-    """ Now, here we go with the stuff we were requested: to resolve
+    """ Now, here we go with the stuff we were requested: resolving
     to a playable URL """
 
     """ TODO: for now, we are discarding YouTube links provided by
@@ -190,7 +190,7 @@ if "track" in args:
 
     try:
         ydl_opts = {
-            'format': 'best',
+            'format': 'bestaudio',
             'no_color': True
         }
         ydl = YoutubeDL(ydl_opts)
@@ -210,10 +210,24 @@ elif "station" in args:
     track = get_next_track(args["station"][0])
 
     if track:
+        # We first remove all other items from the playlist so we can do our magic
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
+        # but we save a reference to our starting list item to add it later
+        current_li = playlist[playlist.getposition()]
+        playlist.clear()
+
         artists = artists_str(track["artists"])
         li = xbmcgui.ListItem(path="%s?track=%s&station=%s" % (base_url, track["url"], args["station"][0]))
         li.setInfo("music", {'artist': artists, 'title': track["name"]})
         li.setProperty('IsPlayable', 'true')
+
+        """We need to add back to the playlist our starting item with a reference to the station
+        (well, it doesn't really matter what the first item is) and also the first song from the
+        station we are going to play now.
+        Without this, it would stop playing after the first song."""
+        playlist.add(url="%s?%s" % (base_url, sys.argv[2][1:]), listitem=current_li, index=0)
+        playlist.add(url="%s?track=%s&station=%s" % (base_url, track["url"], args["station"][0]), listitem=li, index=1)
+
         xbmcplugin.setResolvedUrl(addon_handle, True, li)
 
     else:
