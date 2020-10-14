@@ -233,7 +233,7 @@ elif "station" in args:
         playlist.clear()
 
         artists = artists_array(track["artists"])
-        li = xbmcgui.ListItem(path="{}?track={}&station={}&video={}".format(base_url, track["url"], args["station"][0], want_video()))
+        li = xbmcgui.ListItem(" - ".join([", ".join(artists) if want_video() else artists, track["name"]]), path="{}?track={}&station={}&video={}".format(base_url, track["url"], args["station"][0], want_video()))
         li.setInfo("video" if want_video() else "music", {'artist': artists, 'title': track["name"]})
         li.setProperty('IsPlayable', 'true')
 
