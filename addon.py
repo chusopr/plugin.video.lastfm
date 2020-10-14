@@ -30,20 +30,24 @@ args = urlparse.parse_qs(sys.argv[2][1:])
 def log(msg, level=xbmc.LOGINFO):
     xbmc.log(msg="[%s] %s" % (addon_name, msg), level=level)
 
+def want_video():
+    return ("content_type" in args and "video" in args["content_type"]) or ("video" in args and "True" in args["video"])
+
 # Method to show main menu
 def main_menu():
-    xbmcplugin.setContent(addon_handle, 'musicvideos')
     lastfm_user = xbmcaddon.Addon().getSetting("username")
     if not lastfm_user:
         xbmcgui.Dialog().ok("Not configured", "Please configure first")
     else:
+        xbmcplugin.setContent(addon_handle, 'music{}'.format('videos' if want_video() else ''))
         """ Was neighbours station shut down? Or is it only one of the
         services not working after Last.fm rolled out their beta and
         everything is broken until it comes back "soon"? """
         for station in ["library", "mix", "recommended"]:
             li = xbmcgui.ListItem('Last.fm %s %s' % (lastfm_user, station), iconImage='DefaultMusicPlaylists.png')
+            li.setInfo("video" if want_video() else "music", {})
             li.setProperty('IsPlayable', 'true')
-            xbmcplugin.addDirectoryItem(handle=addon_handle, url="%s?station=user/%s/%s" % (base_url, lastfm_user, station), listitem=li)
+            xbmcplugin.addDirectoryItem(handle=addon_handle, url="{}?station=user/{}/{}&video={}".format(base_url, lastfm_user, station, want_video()), listitem=li)
         xbmcplugin.endOfDirectory(addon_handle)
 
 """ Last.fm servers seemed to be pretty unstable when their beta website was
@@ -55,12 +59,17 @@ def lastfm_error_retry(msg):
     return xbmcgui.Dialog().yesno("Last.fm error", msg, "Last.fm servers seem to fail randomly sometimes", "Do you want to try again?")
 
 """ Last.fm returns track artist as an array of artists.
-This function converts that array to a comma-separated string"""
-def artists_str(artists_array):
-    s = artists_array[0]["name"]
-    for i in range(1, len(artists_array)):
-        s += ", " + artists_array[i]["name"]
-    return s
+This function converts that array to a comma-separated string for music items
+or an array of strings for videos"""
+def artists_array(artists_array):
+    artists = [artists_array[0]["name"]] if want_video() else artists_array[0]["name"]
+    if want_video():
+        for i in range(1, len(artists_array)):
+            artists.append(artists_array[i]["name"])
+    else:
+        for i in range(1, len(artists_array)):
+            artists += ", " + artists_array[i]["name"]
+    return artists
 
 # Get next track from given station
 def get_next_track(station):
@@ -177,12 +186,12 @@ if "track" in args:
     track to playlist """
     if next_track:
         log(msg="Queueing track %s" % next_track["url"], level=xbmc.LOGDEBUG)
-        artists = artists_str(next_track["artists"])
-        li = xbmcgui.ListItem(" - ".join([artists, next_track["name"]]))
-        li.setInfo("music", {'artist': artists, 'title': next_track["name"]})
+        artists = artists_array(next_track["artists"])
+        li = xbmcgui.ListItem(" - ".join([", ".join(artists) if want_video() else artists, next_track["name"]]))
+        li.setInfo("video" if want_video() else "music", {'artist': artists, 'title': next_track["name"]})
         li.setProperty('IsPlayable', 'true')
-        playlist = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
-        playlist.add(url="%s?track=%s&station=%s" % (base_url, next_track["url"].replace("&", "%26"), station_arg), listitem=li, index=playlist.size())
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+        playlist.add(url="{}?track={}&station={}&video={}".format(base_url, next_track["url"].replace("&", "%26"), station_arg, want_video()), listitem=li, index=playlist.size())
 
     """ Now, here we go with the stuff we were requested: resolving
     to a playable URL """
@@ -197,7 +206,7 @@ if "track" in args:
 
     try:
         ydl_opts = {
-            'format': 'bestaudio',
+            'format': 'best{}'.format('' if want_video() else 'audio'),
             'no_color': True
         }
         ydl = YoutubeDL(ydl_opts)
@@ -206,7 +215,7 @@ if "track" in args:
         if len(playback_url["entries"]) == 0:
             raise DownloadError("Song not found")
         li = xbmcgui.ListItem(path=playback_url["entries"][0]["url"])
-        li.setInfo("music", {'artist': artist, 'title': title})
+        li.setInfo("video" if want_video() else "music", {'artist': [artist], 'title': title})
         xbmcplugin.setResolvedUrl(addon_handle, True, li)
     except DownloadError:
         xbmcgui.Dialog().ok("Song not found", ' - '.join([artist, title]))
@@ -218,22 +227,23 @@ elif "station" in args:
 
     if track:
         # We first remove all other items from the playlist so we can do our magic
-        playlist = xbmc.PlayList(xbmc.PLAYLIST_MUSIC)
+        playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
         # but we save a reference to our starting list item to add it later
         current_li = playlist[playlist.getposition()]
         playlist.clear()
 
-        artists = artists_str(track["artists"])
-        li = xbmcgui.ListItem(path="%s?track=%s&station=%s" % (base_url, track["url"], args["station"][0]))
-        li.setInfo("music", {'artist': artists, 'title': track["name"]})
+        artists = artists_array(track["artists"])
+        li = xbmcgui.ListItem(path="{}?track={}&station={}&video={}".format(base_url, track["url"], args["station"][0], want_video()))
+        li.setInfo("video" if want_video() else "music", {'artist': artists, 'title': track["name"]})
         li.setProperty('IsPlayable', 'true')
 
         """We need to add back to the playlist our starting item with a reference to the station
         (well, it doesn't really matter what the first item is) and also the first song from the
         station we are going to play now.
         Without this, it would stop playing after the first song."""
+        current_li.setInfo("video" if want_video() else "music", {})
         playlist.add(url="%s?%s" % (base_url, sys.argv[2][1:]), listitem=current_li, index=0)
-        playlist.add(url="%s?track=%s&station=%s" % (base_url, track["url"], args["station"][0]), listitem=li, index=1)
+        playlist.add(url="{}?track={}&station={}&video={}".format(base_url, track["url"], args["station"][0], want_video()), listitem=li, index=1)
 
         xbmcplugin.setResolvedUrl(addon_handle, True, li)
 
